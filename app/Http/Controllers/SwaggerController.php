@@ -218,228 +218,142 @@ class SwaggerController extends Controller
                 'get' => [
                     'tags' => ['Trading'],
                     'summary' => 'Get current crypto rates',
+                    'description' => 'Get current exchange rates for supported cryptocurrencies (BTC, ETH, USDT) in NGN and USD',
                     'security' => [],
                     'responses' => [
                         '200' => [
-                            'description' => 'Current rates',
+                            'description' => 'Current rates retrieved successfully',
                             'content' => [
                                 'application/json' => [
-                                    'schema' => ['$ref' => '#/components/schemas/Rates'],
+                                    'schema' => ['$ref' => '#/components/schemas/RatesResponse'],
+                                ],
+                            ],
+                        ],
+                        '500' => ['description' => 'Unable to fetch current rates'],
+                    ],
+                ],
+            ],
+            '/trades/buy' => [
+                'post' => [
+                    'tags' => ['Trading'],
+                    'summary' => 'Buy cryptocurrency',
+                    'description' => 'Buy crypto using Naira balance. A 2% fee is charged on purchases.',
+                    'security' => [['bearerAuth' => []]],
+                    'requestBody' => [
+                        'required' => true,
+                        'content' => [
+                            'application/json' => [
+                                'schema' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'crypto_symbol' => ['type' => 'string', 'enum' => ['btc', 'eth', 'usdt'], 'example' => 'btc'],
+                                        'amount' => ['type' => 'number', 'example' => 0.5, 'description' => 'Amount of cryptocurrency to buy'],
+                                    ],
+                                    'required' => ['crypto_symbol', 'amount'],
                                 ],
                             ],
                         ],
                     ],
-                ],
-            ],
-            '/data/global' => [
-                'get' => [
-                    'tags' => ['Market Data'],
-                    'summary' => 'Get global cryptocurrency data',
-                    'security' => [],
                     'responses' => [
-                        '200' => ['description' => 'Global market data'],
-                        '500' => ['description' => 'Error fetching data'],
+                        '201' => [
+                            'description' => 'Purchase successful',
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => ['$ref' => '#/components/schemas/TradeResponse'],
+                                ],
+                            ],
+                        ],
+                        '401' => ['description' => 'Unauthorized'],
+                        '422' => ['description' => 'Validation error - insufficient balance, minimum amount not met, or invalid crypto amount'],
+                        '503' => ['description' => 'Unable to fetch current rate'],
+                        '500' => ['description' => 'Trade failed'],
                     ],
                 ],
             ],
-            '/data/trending' => [
-                'get' => [
-                    'tags' => ['Market Data'],
-                    'summary' => 'Get trending coins and NFTs',
-                    'security' => [],
+            '/trades/sell' => [
+                'post' => [
+                    'tags' => ['Trading'],
+                    'summary' => 'Sell cryptocurrency',
+                    'description' => 'Sell crypto to receive Naira. A 2% fee is deducted from proceeds.',
+                    'security' => [['bearerAuth' => []]],
+                    'requestBody' => [
+                        'required' => true,
+                        'content' => [
+                            'application/json' => [
+                                'schema' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'crypto_symbol' => ['type' => 'string', 'enum' => ['btc', 'eth', 'usdt'], 'example' => 'btc'],
+                                        'amount' => ['type' => 'number', 'example' => 0.5, 'description' => 'Amount of cryptocurrency to sell'],
+                                    ],
+                                    'required' => ['crypto_symbol', 'amount'],
+                                ],
+                            ],
+                        ],
+                    ],
                     'responses' => [
-                        '200' => ['description' => 'Trending data'],
-                        '500' => ['description' => 'Error fetching data'],
+                        '201' => [
+                            'description' => 'Sale successful',
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => ['$ref' => '#/components/schemas/TradeResponse'],
+                                ],
+                            ],
+                        ],
+                        '401' => ['description' => 'Unauthorized'],
+                        '422' => ['description' => 'Validation error - insufficient crypto holdings, minimum amount not met, or invalid crypto amount'],
+                        '503' => ['description' => 'Unable to fetch current rate'],
+                        '500' => ['description' => 'Trade failed'],
                     ],
                 ],
             ],
-            '/data/gainers-losers' => [
+            '/trades/history' => [
                 'get' => [
-                    'tags' => ['Market Data'],
-                    'summary' => 'Get top gainers and losers in 24h',
-                    'security' => [],
-                    'responses' => [
-                        '200' => ['description' => 'Gainers and losers data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/categories' => [
-                'get' => [
-                    'tags' => ['Market Data'],
-                    'summary' => 'Get all cryptocurrency categories',
-                    'security' => [],
-                    'responses' => [
-                        '200' => ['description' => 'Categories list'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/markets' => [
-                'get' => [
-                    'tags' => ['Market Data'],
-                    'summary' => 'Get all supported coins with market data',
-                    'security' => [],
+                    'tags' => ['Trading'],
+                    'summary' => 'Get user trade history',
+                    'description' => 'Retrieve paginated list of all trades made by the authenticated user',
+                    'security' => [['bearerAuth' => []]],
                     'parameters' => [
-                        ['name' => 'page', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 1]],
-                        ['name' => 'per_page', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 250]],
+                        [
+                            'name' => 'page',
+                            'in' => 'query',
+                            'description' => 'Page number for pagination',
+                            'schema' => ['type' => 'integer', 'default' => 1],
+                        ],
+                        [
+                            'name' => 'per_page',
+                            'in' => 'query',
+                            'description' => 'Records per page',
+                            'schema' => ['type' => 'integer', 'default' => 20],
+                        ],
+                        [
+                            'name' => 'symbol',
+                            'in' => 'query',
+                            'description' => 'Filter by cryptocurrency symbol (btc, eth, usdt)',
+                            'schema' => ['type' => 'string', 'enum' => ['btc', 'eth', 'usdt']],
+                        ],
+                        [
+                            'name' => 'type',
+                            'in' => 'query',
+                            'description' => 'Filter by trade type',
+                            'schema' => ['type' => 'string', 'enum' => ['buy', 'sell']],
+                        ],
                     ],
                     'responses' => [
-                        '200' => ['description' => 'Markets data'],
-                        '500' => ['description' => 'Error fetching data'],
+                        '200' => [
+                            'description' => 'Trade history retrieved successfully',
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => ['$ref' => '#/components/schemas/TradeHistoryResponse'],
+                                ],
+                            ],
+                        ],
+                        '401' => ['description' => 'Unauthorized'],
+                        '500' => ['description' => 'Unable to fetch trade history'],
                     ],
                 ],
             ],
-            '/data/coins/{coinId}' => [
-                'get' => [
-                    'tags' => ['Coins Data'],
-                    'summary' => 'Get coin data by ID',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'coinId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'example' => 'bitcoin']],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Coin data'],
-                        '404' => ['description' => 'Coin not found'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/coins/{coinId}/history' => [
-                'get' => [
-                    'tags' => ['Coins Data'],
-                    'summary' => 'Get historical price data for a coin',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'coinId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'date', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'example' => 'dd-mm-yyyy']],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Historical data'],
-                        '400' => ['description' => 'Date parameter required'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/coins/{coinId}/market-chart' => [
-                'get' => [
-                    'tags' => ['Coins Data'],
-                    'summary' => 'Get market chart data for a coin',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'coinId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'days', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 7]],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Market chart data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/coins/{coinId}/ohlc' => [
-                'get' => [
-                    'tags' => ['Coins Data'],
-                    'summary' => 'Get OHLC candlestick data for a coin',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'coinId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'days', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 7]],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'OHLC data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/exchanges/{exchangeId}' => [
-                'get' => [
-                    'tags' => ['Exchanges Data'],
-                    'summary' => 'Get exchange information',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'exchangeId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Exchange data'],
-                        '404' => ['description' => 'Exchange not found'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/exchanges/{exchangeId}/volume-chart' => [
-                'get' => [
-                    'tags' => ['Exchanges Data'],
-                    'summary' => 'Get exchange volume chart data',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'exchangeId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'days', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 7]],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Volume chart data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/exchanges/{exchangeId}/tickers' => [
-                'get' => [
-                    'tags' => ['Exchanges Data'],
-                    'summary' => 'Get exchange tickers',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'exchangeId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'page', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 1]],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Tickers data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/nfts/{nftId}' => [
-                'get' => [
-                    'tags' => ['NFTs Data'],
-                    'summary' => 'Get NFT data',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'nftId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'NFT data'],
-                        '404' => ['description' => 'NFT not found'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/nfts/{nftId}/market-chart' => [
-                'get' => [
-                    'tags' => ['NFTs Data'],
-                    'summary' => 'Get NFT market chart data',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'nftId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                        ['name' => 'days', 'in' => 'query', 'schema' => ['type' => 'integer', 'default' => 7]],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'NFT market chart data'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
-            '/data/nfts/{nftId}/tickers' => [
-                'get' => [
-                    'tags' => ['NFTs Data'],
-                    'summary' => 'Get NFT tickers',
-                    'security' => [],
-                    'parameters' => [
-                        ['name' => 'nftId', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'NFT tickers'],
-                        '500' => ['description' => 'Error fetching data'],
-                    ],
-                ],
-            ],
+            // Market / coin / exchange / NFT endpoints removed - service only provides rates now
         ];
     }
 
@@ -489,6 +403,82 @@ class SwaggerController extends Controller
                             'btc' => ['type' => 'number'],
                             'eth' => ['type' => 'number'],
                             'usdt' => ['type' => 'number'],
+                        ],
+                    ],
+                ],
+            ],
+            'RatesResponse' => [
+                'type' => 'object',
+                'properties' => [
+                    'success' => ['type' => 'boolean'],
+                    'data' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'symbol' => ['type' => 'string', 'example' => 'BTC'],
+                                'rate_ngn' => ['type' => 'number', 'example' => 95000000],
+                                'rate_usd' => ['type' => 'number', 'example' => 61290.32],
+                            ],
+                        ],
+                    ],
+                    'timestamp' => ['type' => 'string', 'format' => 'date-time'],
+                ],
+            ],
+            'Trade' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'user_id' => ['type' => 'integer'],
+                    'type' => ['type' => 'string', 'enum' => ['buy', 'sell']],
+                    'crypto_symbol' => ['type' => 'string'],
+                    'amount' => ['type' => 'string', 'format' => 'decimal'],
+                    'naira_amount' => ['type' => 'string', 'format' => 'decimal'],
+                    'rate' => ['type' => 'string', 'format' => 'decimal'],
+                    'fee' => ['type' => 'string', 'format' => 'decimal'],
+                    'status' => ['type' => 'string', 'enum' => ['completed', 'pending']],
+                    'created_at' => ['type' => 'string', 'format' => 'date-time'],
+                    'updated_at' => ['type' => 'string', 'format' => 'date-time'],
+                ],
+            ],
+            'TradeResponse' => [
+                'type' => 'object',
+                'properties' => [
+                    'success' => ['type' => 'boolean'],
+                    'message' => ['type' => 'string'],
+                    'data' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'trade_id' => ['type' => 'integer'],
+                            'type' => ['type' => 'string', 'enum' => ['buy', 'sell']],
+                            'crypto' => ['type' => 'string'],
+                            'crypto_amount' => ['type' => 'number'],
+                            'rate' => ['type' => 'number'],
+                            'subtotal' => ['type' => 'number'],
+                            'fee' => ['type' => 'number'],
+                            'total_cost' => ['type' => 'number'],
+                            'fee_percent' => ['type' => 'number'],
+                            'timestamp' => ['type' => 'string', 'format' => 'date-time'],
+                            'new_balance' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+            ],
+            'TradeHistoryResponse' => [
+                'type' => 'object',
+                'properties' => [
+                    'success' => ['type' => 'boolean'],
+                    'data' => [
+                        'type' => 'array',
+                        'items' => ['$ref' => '#/components/schemas/Trade'],
+                    ],
+                    'pagination' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'total' => ['type' => 'integer'],
+                            'per_page' => ['type' => 'integer'],
+                            'current_page' => ['type' => 'integer'],
+                            'last_page' => ['type' => 'integer'],
                         ],
                     ],
                 ],

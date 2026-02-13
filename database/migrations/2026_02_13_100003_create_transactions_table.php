@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('type', ['deposit', 'withdrawal', 'trade_fee', 'trade_credit']);
+            $table->enum('type', ['deposit', 'withdrawal', 'trade_fee', 'trade_credit', 'buy_crypto', 'sell_crypto']);
             $table->decimal('amount', 15, 2);
             $table->string('description')->nullable();
             $table->decimal('previous_balance', 15, 2);
