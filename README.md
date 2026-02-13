@@ -37,8 +37,8 @@ Server runs on `http://localhost:8000`
 
 ### Access API Documentation
 ```
-Swagger UI: http://localhost:8000/api-docs
-API Spec: http://localhost:8000/api-docs.json
+Swagger UI: http://localhost:8000/swagger
+API Spec: http://localhost:8000/swagger.json
 ```
 
 ## Architecture & Design Decisions
