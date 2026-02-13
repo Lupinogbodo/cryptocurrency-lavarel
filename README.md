@@ -50,13 +50,6 @@ API Spec: http://localhost:8000/swagger.json
 - **Caching**: CoinGecko rates cached for 5 minutes to reduce API calls
 - **Swagger Documentation**: Interactive API testing built-in
 
-### Fee Structure
-- **2% transaction fee** on both buy and sell operations
-- **Buy**: Fee deducted from user's Naira balance (total cost = crypto value + fee)
-- **Sell**: Fee deducted from proceeds (user receives value minus fee)
-- **Logic**: Fees encourage users to hold positions and reduce frivolous trading
-- All fee transactions tracked in transaction history
-
 ### CoinGecko Integration
 - Uses free CoinGecko API (no authentication required)
 - Fetches NGN (Naira) rates for BTC, ETH, USDT
