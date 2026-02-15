@@ -19,14 +19,9 @@ class CoinGeckoService
         'usdt' => 'tether',
     ];
 
-    /**
-     * Make API request - FREE TIER DOESN'T NEED API KEY
-     * Just remove COINGECKO_API_KEY from your .env file
-     */
     private function makeRequest($endpoint, $params = [], $cacheMinutes = null)
     {
         try {
-            // Free tier doesn't need API key - so we don't send any headers
             $headers = [];
             
             \Log::debug("CoinGecko API Request", [

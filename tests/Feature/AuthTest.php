@@ -21,7 +21,9 @@ class AuthTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonStructure(['user', 'token']);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
-        $this->assertDatabaseHas('wallets', ['user_id' => 1]);
+        // Check that a wallet was created with the user
+        $user = \App\Models\User::where('email', 'test@example.com')->first();
+        $this->assertDatabaseHas('wallets', ['user_id' => $user->id]);
     }
 
     public function test_user_can_login()

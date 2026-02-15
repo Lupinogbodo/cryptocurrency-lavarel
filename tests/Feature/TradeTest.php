@@ -199,6 +199,323 @@ class TradeTest extends TestCase
         $response = $this->getJson('/api/trades/rates');
         $response->assertStatus(200);
     }
+
+    public function test_buy_invalid_crypto_symbol()
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'invalid_coin',
+                'amount' => 0.001,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('crypto_symbol');
+    }
+
+    public function test_sell_invalid_crypto_symbol()
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/sell', [
+                'crypto_symbol' => 'doge',
+                'amount' => 0.001,
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_buy_minimum_amount_validation()
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'btc',
+                'amount' => 0.00005, // Below BTC minimum
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertFalse($response->json('success'));
+    }
+
+    public function test_sell_exact_holdings_amount()
+    {
+        $holdingAmount = 0.5;
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'eth',
+            'amount' => $holdingAmount,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/sell', [
+                'crypto_symbol' => 'eth',
+                'amount' => $holdingAmount,
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertTrue($response->json('success'));
+
+        // Verify holding is depleted
+        $holding = CryptoHolding::where('wallet_id', $this->wallet->id)
+            ->where('crypto_symbol', 'eth')
+            ->first();
+
+        $this->assertEquals(0, $holding->amount);
+    }
+
+    public function test_sell_more_than_holdings()
+    {
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'usdt',
+            'amount' => 50,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/sell', [
+                'crypto_symbol' => 'usdt',
+                'amount' => 100, // More than available
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertFalse($response->json('success'));
+    }
+
+    public function test_buy_fee_calculation()
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'btc',
+                'amount' => 0.001,
+            ]);
+
+        $data = $response->json('data');
+        $subtotal = $data['subtotal'];
+        $fee = $data['fee'];
+        $totalCost = $data['total_cost'];
+
+        // Verify fee is 2% of subtotal
+        $expectedFee = $subtotal * 0.02;
+        $this->assertAlmostEquals($expectedFee, $fee, 2);
+
+        // Verify total = subtotal + fee
+        $this->assertAlmostEquals($subtotal + $fee, $totalCost, 2);
+    }
+
+    public function test_sell_fee_deduction()
+    {
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'btc',
+            'amount' => 1.0,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/sell', [
+                'crypto_symbol' => 'btc',
+                'amount' => 0.1,
+            ]);
+
+        $data = $response->json('data');
+        $grossProceeds = $data['gross_proceeds'];
+        $fee = $data['fee'];
+        $netProceeds = $data['net_proceeds'];
+
+        // Verify fee is 2% of gross proceeds
+        $expectedFee = $grossProceeds * 0.02;
+        $this->assertAlmostEquals($expectedFee, $fee, 2);
+
+        // Verify net = gross - fee
+        $this->assertAlmostEquals($grossProceeds - $fee, $netProceeds, 2);
+    }
+
+    public function test_buy_creates_holding_if_not_exists()
+    {
+        $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'eth',
+                'amount' => 0.1,
+            ]);
+
+        $holding = CryptoHolding::where('wallet_id', $this->wallet->id)
+            ->where('crypto_symbol', 'eth')
+            ->first();
+
+        $this->assertNotNull($holding);
+        $this->assertEquals(0.1, $holding->amount);
+    }
+
+    public function test_buy_increments_existing_holding()
+    {
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'eth',
+            'amount' => 0.5,
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'eth',
+                'amount' => 0.1,
+            ]);
+
+        $holding = CryptoHolding::where('wallet_id', $this->wallet->id)
+            ->where('crypto_symbol', 'eth')
+            ->first();
+
+        $this->assertEquals(0.6, $holding->amount);
+    }
+
+    public function test_multiple_trades_history()
+    {
+        // Make multiple trades
+        for ($i = 0; $i < 5; $i++) {
+            $this->actingAs($this->user)
+                ->postJson('/api/trades/buy', [
+                    'crypto_symbol' => 'btc',
+                    'amount' => 0.001,
+                ]);
+        }
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/trades/history');
+
+        $response->assertStatus(200);
+        $this->assertEquals(5, $response->json('pagination.total'));
+    }
+
+    public function test_trade_history_filter_by_symbol()
+    {
+        // Make different trades
+        $this->actingAs($this->user)->postJson('/api/trades/buy', [
+            'crypto_symbol' => 'btc',
+            'amount' => 0.001,
+        ]);
+
+        $this->actingAs($this->user)->postJson('/api/trades/buy', [
+            'crypto_symbol' => 'eth',
+            'amount' => 0.01,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/trades/history?symbol=btc');
+
+        $data = $response->json('data');
+        $this->assertCount(1, $data);
+        $this->assertEquals('btc', strtolower($data[0]['crypto_symbol']));
+    }
+
+    public function test_trade_history_filter_by_type()
+    {
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'btc',
+            'amount' => 1.0,
+        ]);
+
+        // Buy trade
+        $this->actingAs($this->user)->postJson('/api/trades/buy', [
+            'crypto_symbol' => 'eth',
+            'amount' => 0.1,
+        ]);
+
+        // Sell trade
+        $this->actingAs($this->user)->postJson('/api/trades/sell', [
+            'crypto_symbol' => 'btc',
+            'amount' => 0.1,
+        ]);
+
+        // Filter for sell only
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/trades/history?type=sell');
+
+        $data = $response->json('data');
+        $this->assertCount(1, $data);
+        $this->assertEquals('sell', $data[0]['type']);
+    }
+
+    public function test_wallet_balance_decreases_after_buy()
+    {
+        $initialBalance = $this->wallet->naira_balance;
+
+        $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'btc',
+                'amount' => 0.001,
+            ]);
+
+        $this->wallet->refresh();
+        $this->assertLessThan($initialBalance, $this->wallet->naira_balance);
+    }
+
+    public function test_wallet_balance_increases_after_sell()
+    {
+        $initialBalance = $this->wallet->naira_balance;
+
+        CryptoHolding::create([
+            'wallet_id' => $this->wallet->id,
+            'crypto_symbol' => 'btc',
+            'amount' => 1.0,
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson('/api/trades/sell', [
+                'crypto_symbol' => 'btc',
+                'amount' => 0.1,
+            ]);
+
+        $this->wallet->refresh();
+        $this->assertGreaterThan($initialBalance, $this->wallet->naira_balance);
+    }
+
+    public function test_trade_status_completed()
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/trades/buy', [
+                'crypto_symbol' => 'usdt',
+                'amount' => 10,
+            ]);
+
+        $tradeId = $response->json('data.trade_id');
+        $trade = \App\Models\Trade::find($tradeId);
+
+        $this->assertEquals('completed', $trade->status);
+    }
+
+    public function test_sell_crypto_without_authentication()
+    {
+        $response = $this->postJson('/api/trades/sell', [
+            'crypto_symbol' => 'btc',
+            'amount' => 0.1,
+        ]);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_trade_history_without_authentication()
+    {
+        $response = $this->getJson('/api/trades/history');
+
+        $response->assertStatus(401);
+    }
+
+    public function test_buy_all_supported_cryptos()
+    {
+        $cryptos = ['btc', 'eth', 'usdt'];
+        $amounts = ['btc' => 0.001, 'eth' => 0.01, 'usdt' => 10];
+
+        foreach ($cryptos as $crypto) {
+            $response = $this->actingAs($this->user)
+                ->postJson('/api/trades/buy', [
+                    'crypto_symbol' => $crypto,
+                    'amount' => $amounts[$crypto],
+                ]);
+
+            $response->assertStatus(201);
+            $this->assertTrue($response->json('success'));
+        }
+    }
+
+    protected function assertAlmostEquals($expected, $actual, $precision = 2)
+    {
+        $this->assertEqualsWithDelta($expected, $actual, 0.01, "Expected {$expected}, got {$actual}");
+    }
 }
-
-

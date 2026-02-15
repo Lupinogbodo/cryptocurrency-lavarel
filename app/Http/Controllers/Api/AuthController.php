@@ -62,7 +62,15 @@ class AuthController
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        
+        // Handle both real tokens and test tokens
+        if ($token && method_exists($token, 'delete')) {
+            $token->delete();
+        } elseif ($token) {
+            // For test tokens, revoke all tokens for the user
+            $request->user()->tokens()->delete();
+        }
 
         return response()->json(['message' => 'Logged out successfully']);
     }

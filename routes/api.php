@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\TradeController;
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
+// Public endpoints (no authentication required)
+Route::get('/trades/rates', [TradeController::class, 'rates']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/profile', [AuthController::class, 'profile']);
@@ -22,5 +25,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trades/history', [TradeController::class, 'history']);
 });
 
-Route::get('/trades/rates', [TradeController::class, 'rates']);
+
 
